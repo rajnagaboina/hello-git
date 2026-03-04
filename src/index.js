@@ -1,11 +1,11 @@
+
 //!/usr/bin/env node
 /**
- * Task Manager CLI — Feature 1 (add + help)
- * Stores tasks in tasks.json at repo root.
- *
- * Usage:
+ * Task Manager CLI — Feature 2 (list + filters)
+ * Commands:
  *   node src/index.js help
  *   node src/index.js add "Task title"
+ *   node src/index.js list [--all|--open|--done]
  */
 
 const fs = require('fs');
@@ -22,7 +22,12 @@ function ensureDb() {
 function loadTasks() {
   ensureDb();
   const text = fs.readFileSync(DB_PATH, 'utf-8').trim() || '[]';
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('❌ tasks.json is not valid JSON. Fix or delete it to reset.');
+    process.exit(1);
+  }
 }
 
 function saveTasks(tasks) {
@@ -51,6 +56,49 @@ function addTask(title) {
   console.log(`✅ Added task #${task.id}: ${task.title}`);
 }
 
+function formatRow(id, status, title) {
+  const col1 = String(id).padEnd(4);
+  const col2 = status.padEnd(6);
+  return `${col1} ${col2} ${title}`;
+}
+
+function listTasks(flag = '--open') {
+  const tasks = loadTasks();
+  let filtered = tasks;
+
+  switch (flag) {
+    case '--all':
+      filtered = tasks;
+      break;
+    case '--done':
+      filtered = tasks.filter(t => !!t.done);
+      break;
+    case '--open':
+    default:
+      filtered = tasks.filter(t => !t.done);
+      break;
+  }
+
+  if (tasks.length === 0) {
+    console.log('ℹ️  No tasks yet. Add one:');
+    console.log('   node src/index.js add "Your first task"');
+    return;
+  }
+
+  if (filtered.length === 0) {
+    console.log('ℹ️  No tasks match this filter.');
+    return;
+  }
+
+  console.log('\nID   STAT  TITLE');
+  console.log('---- ----- --------------------------------');
+  for (const t of filtered) {
+    const status = t.done ? '✓' : '·';
+    console.log(formatRow(t.id, status, t.title));
+  }
+  console.log('');
+}
+
 function showHelp() {
   console.log(`
 Task Manager CLI
@@ -58,10 +106,12 @@ Task Manager CLI
 Commands:
   node src/index.js help
   node src/index.js add "Task title"
+  node src/index.js list [--all|--open|--done]
 
 Examples:
   node src/index.js add "Buy groceries"
-  node src/index.js add "Read 10 pages"
+  node src/index.js list
+  node src/index.js list --done
   `);
 }
 
@@ -71,6 +121,12 @@ function main() {
     case 'add':
       addTask(args.join(' '));
       break;
+    case 'list': {
+      // default to --open if no flag provided
+      const flag = args[0] || '--open';
+      listTasks(flag);
+      break;
+    }
     case 'help':
     default:
       showHelp();
